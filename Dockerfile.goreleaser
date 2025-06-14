@@ -16,23 +16,20 @@ RUN CAESIUM_LATEST_RELEASE=$(curl -s https://api.github.com/repos/$CAESIUM_GITHU
 
 FROM zocker160/handbrake-nvenc:latest
 
-# Use apt-get for Ubuntu, add a PPA for special packages, and use correct package names
+# Install required tools (no external PPA needed)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends software-properties-common && \
-    # Add the -y flag here to auto-confirm adding the PPA
-    add-apt-repository -y ppa:savvymike/ppa && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-    jq \
-    curl \
-    libvips-tools \
-    exiftool \
-    ffmpeg \
-    imagemagick \
-    libjxl-tools \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      jq \
+      curl \
+      libvips-tools \
+      exiftool \
+      ffmpeg \
+      imagemagick \
+      libjxl-tools \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/bin/caesiumclt /usr/local/bin/caesiumclt
+
 
 COPY config/lossless /etc/immich-upload-optimizer/config
 COPY config /etc/immich-upload-optimizer/bundled-configs
