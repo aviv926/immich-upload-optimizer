@@ -14,6 +14,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      # STEP 1: Add this step to set up the Go programming language environment
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21' # Or whatever version your project uses
+
+      # STEP 2: Add this step to compile your Go application
+      # This creates the 'immich-upload-optimizer' binary file in the workspace
+      - name: Build Go application
+        run: go build -v -o immich-upload-optimizer .
+
+      # --- The rest of your workflow remains the same ---
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -29,5 +42,5 @@ jobs:
         with:
           context: .
           file: Dockerfile.goreleaser
-          push: true
+          push: ${{ github.event_name != 'pull_request' }} # Recommended: Don't push on pull requests
           tags: ghcr.io/${{ github.repository_owner }}/immich-upload-optimizer:latest
