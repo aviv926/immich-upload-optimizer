@@ -1,4 +1,4 @@
-module github.com/${GHCR_USER}/immich-upload-optimizer
+module github.com/aviv926/immich-upload-optimizer
 
 go 1.23.4
 
