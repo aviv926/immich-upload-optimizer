@@ -1,7 +1,7 @@
 name: goreleaser
 
 on:
-  workflow_dispatch: # This line enables manual triggers
+  workflow_dispatch:
   pull_request:
   push:
     tags:
@@ -36,12 +36,27 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      # This step will only run for tag pushes (e.g., v1.0.0, v1.1.0)
       -
-        name: Run GoReleaser
+        name: Run GoReleaser for tags
+        if: startsWith(github.ref, 'refs/tags/')
         uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
           version: "~> v2"
           args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # This step will only run for manual triggers, pull requests, etc.
+      -
+        name: Run GoReleaser for snapshots
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean --snapshot
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
