@@ -22,7 +22,7 @@ dockers:
     goos: linux
     goarch: amd64
     image_templates:
-    - "ghcr.io/${GHCR_USER}/{{.ProjectName}}:{{ .Tag }}-amd64"
+    - "ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:{{ .Tag }}-amd64"
     dockerfile: 'Dockerfile.goreleaser'
     use: buildx
     build_flag_templates:
@@ -41,7 +41,7 @@ dockers:
     goos: linux
     goarch: arm64
     image_templates:
-    - "ghcr.io/${GHCR_USER}/{{.ProjectName}}:{{ .Tag }}-arm64v8"
+    - "ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:{{ .Tag }}-arm64v8"
     dockerfile: 'Dockerfile.goreleaser'
     use: buildx
     build_flag_templates:
@@ -58,12 +58,12 @@ dockers:
     - LICENSE
 docker_manifests:
   - 
-    name_template: ghcr.io/${GHCR_USER}/{{ .ProjectName }}:latest
+    name_template: ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:latest
     image_templates:
     - ghcr.io/${GHCR_USER}/{{ .ProjectName }}:{{ .Tag }}-amd64
     - ghcr.io/${GHCR_USER}/{{ .ProjectName }}:{{ .Tag }}-arm64v8
   - 
-    name_template: ghcr.io/${GHCR_USER}/{{ .ProjectName }}:{{ .Tag }}
+    name_template: ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:{{ .Tag }}
     image_templates:
     - ghcr.io/${GHCR_USER}/{{ .ProjectName }}:{{ .Tag }}-amd64
     - ghcr.io/${GHCR_USER}/{{ .ProjectName }}:{{ .Tag }}-arm64v8
