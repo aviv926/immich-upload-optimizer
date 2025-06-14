@@ -1,9 +1,19 @@
-FROM ubuntu:latest AS builder
+# Stage 1: Build the Go binary
+FROM golang:1.21-alpine AS go-builder
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+# Build a static binary to ensure it runs on different base images
+RUN CGO_ENABLED=0 go build -o /immich-upload-optimizer .
+
+
+# Stage 2: Build the Caesium dependency
+FROM ubuntu:latest AS caesium-builder
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get -qq -y install jq curl
 
 ARG TARGETPLATFORM
-
 ARG CAESIUM_GITHUB_REPO=Lymphatus/caesium-clt
 RUN CAESIUM_LATEST_RELEASE=$(curl -s https://api.github.com/repos/$CAESIUM_GITHUB_REPO/releases/latest | jq -r '.tag_name') \
     && if [ "$TARGETPLATFORM" = "linux/amd64" ]; then CAESIUM_ARCH=x86_64-unknown-linux-musl; \
@@ -14,18 +24,31 @@ RUN CAESIUM_LATEST_RELEASE=$(curl -s https://api.github.com/repos/$CAESIUM_GITHU
     && tar xzf "/tmp/${CAESIUM_ARCHIVE}.tar.gz" -C /tmp \
     && mv "/tmp/${CAESIUM_ARCHIVE}/caesiumclt" /usr/local/bin/caesiumclt
 
+
+# Final Stage: Create the production image
 FROM zocker160/handbrake-nvenc:latest
 
-RUN apk update
-RUN apk add jq curl vips-tools exiftool ffmpeg imagemagick libc6-compat libjxl-tools
+# THE FIX: Use apt-get because the base image is Ubuntu
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    jq \
+    curl \
+    libvips-tools \
+    exiftool \
+    ffmpeg \
+    imagemagick \
+    libc6-compat \
+    libjxl-tools \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /usr/local/bin/caesiumclt /usr/local/bin/caesiumclt
+# Copy the dependency from the caesium-builder stage
+COPY --from=caesium-builder /usr/local/bin/caesiumclt /usr/local/bin/caesiumclt
 
 COPY config/lossless /etc/immich-upload-optimizer/config
 COPY config /etc/immich-upload-optimizer/bundled-configs
 ENV IUO_TASKS_FILE=/etc/immich-upload-optimizer/config/tasks.yaml
 
-# Adjust the COPY source folder based on where your binary is located
-COPY immich-upload-optimizer /usr/local/bin/
+# Copy the binary from the 'go-builder' stage
+COPY --from=go-builder /immich-upload-optimizer /usr/local/bin/
 
 CMD ["immich-upload-optimizer"]
