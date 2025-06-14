@@ -25,6 +25,7 @@ COPY config/lossless /etc/immich-upload-optimizer/config
 COPY config /etc/immich-upload-optimizer/bundled-configs
 ENV IUO_TASKS_FILE=/etc/immich-upload-optimizer/config/tasks.yaml
 
-COPY build/immich-upload-optimizer /usr/local/bin/
+# Adjust the COPY source folder based on where your binary is located
+COPY immich-upload-optimizer /usr/local/bin/
 
 CMD ["immich-upload-optimizer"]
