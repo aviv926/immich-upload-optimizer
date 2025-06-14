@@ -14,10 +14,21 @@ RUN CAESIUM_LATEST_RELEASE=$(curl -s https://api.github.com/repos/$CAESIUM_GITHU
     && tar xzf "/tmp/${CAESIUM_ARCHIVE}.tar.gz" -C /tmp \
     && mv "/tmp/${CAESIUM_ARCHIVE}/caesiumclt" /usr/local/bin/caesiumclt
 
+
 FROM zocker160/handbrake-nvenc:latest
 
-RUN apk update
-RUN apk add jq curl vips-tools exiftool ffmpeg imagemagick libc6-compat libjxl-tools
+# Use apt-get for Ubuntu-based images
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    jq \
+    curl \
+    vips-tools \
+    exiftool \
+    ffmpeg \
+    imagemagick \
+    libc6-compat \
+    libjxl-tools \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/bin/caesiumclt /usr/local/bin/caesiumclt
 
