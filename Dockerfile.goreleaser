@@ -19,7 +19,8 @@ FROM zocker160/handbrake-nvenc:latest
 # Use apt-get for Ubuntu, add a PPA for special packages, and use correct package names
 RUN apt-get update && \
     apt-get install -y --no-install-recommends software-properties-common && \
-    add-apt-repository ppa:savvymike/ppa && \
+    # Add the -y flag here to auto-confirm adding the PPA
+    add-apt-repository -y ppa:savvymike/ppa && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
     jq \
