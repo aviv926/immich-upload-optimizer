@@ -1,42 +1,110 @@
-FROM ubuntu:latest AS builder
-RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get -qq -y install jq curl
+version: 2
+before:
+  hooks:
+    - go generate ./...
+    - go mod tidy
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - 386
+      - amd64
+      - arm
+      - arm64
+    goarm:
+      - 7
+dockers:
+  -
+    goos: linux
+    goarch: amd64
+    image_templates:
+    - "ghcr.io/miguelangel-nubla/{{.ProjectName}}:{{ .Tag }}-amd64"
+    dockerfile: 'Dockerfile.goreleaser'
+    use: buildx
+    build_flag_templates:
+    - "--pull"
+    - "--platform=linux/amd64"
+    - "--label=org.opencontainers.image.created={{.Date}}"
+    - "--label=org.opencontainers.image.title={{.ProjectName}}"
+    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+    - "--label=org.opencontainers.image.version={{.Version}}"
+    - "--label=org.opencontainers.image.url=https://github.com/miguelangel-nubla/{{ .ProjectName }}"
+    - "--label=org.opencontainers.image.source=https://github.com/miguelangel-nubla/{{ .ProjectName }}"
+    extra_files:
+    - config
+    - LICENSE
+  -
+    goos: linux
+    goarch: arm64
+    image_templates:
+    - "ghcr.io/miguelangel-nubla/{{.ProjectName}}:{{ .Tag }}-arm64v8"
+    dockerfile: 'Dockerfile.goreleaser'
+    use: buildx
+    build_flag_templates:
+    - "--pull"
+    - "--platform=linux/arm64/v8"
+    - "--label=org.opencontainers.image.created={{.Date}}"
+    - "--label=org.opencontainers.image.title={{.ProjectName}}"
+    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+    - "--label=org.opencontainers.image.version={{.Version}}"
+    - "--label=org.opencontainers.image.url=https://github.com/miguelangel-nubla/{{ .ProjectName }}"
+    - "--label=org.opencontainers.image.source=https://github.com/miguelangel-nubla/{{ .ProjectName }}"
+    extra_files:
+    - config
+    - LICENSE
+docker_manifests:
+  - 
+    name_template: ghcr.io/miguelangel-nubla/{{ .ProjectName }}:latest
+    image_templates:
+    - ghcr.io/miguelangel-nubla/{{ .ProjectName }}:{{ .Tag }}-amd64
+    - ghcr.io/miguelangel-nubla/{{ .ProjectName }}:{{ .Tag }}-arm64v8
+  - 
+    name_template: ghcr.io/miguelangel-nubla/{{ .ProjectName }}:{{ .Tag }}
+    image_templates:
+    - ghcr.io/miguelangel-nubla/{{ .ProjectName }}:{{ .Tag }}-amd64
+    - ghcr.io/miguelangel-nubla/{{ .ProjectName }}:{{ .Tag }}-arm64v8
+  - 
+    name_template: ghcr.io/miguelangel-nubla/{{.ProjectName}}:v{{ .Major }}
+    image_templates:
+    - ghcr.io/miguelangel-nubla/{{ .ProjectName }}:{{ .Tag }}-amd64
+    - ghcr.io/miguelangel-nubla/{{ .ProjectName }}:{{ .Tag }}-arm64v8
+  - 
+    name_template: ghcr.io/miguelangel-nubla/{{.ProjectName}}:v{{ .Major }}.{{ .Minor }}
+    image_templates:
+    - ghcr.io/miguelangel-nubla/{{ .ProjectName }}:{{ .Tag }}-amd64
+    - ghcr.io/miguelangel-nubla/{{ .ProjectName }}:{{ .Tag }}-arm64v8
+archives:
+  - 
+    files:
+      - LICENSE*
+      - README*
+      - CHANGELOG*
+    formats: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+    - goos: windows
+      formats: zip
 
-ARG TARGETPLATFORM
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
 
-ARG CAESIUM_GITHUB_REPO=Lymphatus/caesium-clt
-RUN CAESIUM_LATEST_RELEASE=$(curl -s https://api.github.com/repos/$CAESIUM_GITHUB_REPO/releases/latest | jq -r '.tag_name') \
-    && if [ "$TARGETPLATFORM" = "linux/amd64" ]; then CAESIUM_ARCH=x86_64-unknown-linux-musl; \
-       elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then CAESIUM_ARCH=aarch64-unknown-linux-musl; \
-       else echo "Platform not supported by ${CAESIUM_GITHUB_REPO}"; exit 126; fi \
-    && CAESIUM_ARCHIVE=caesiumclt-${CAESIUM_LATEST_RELEASE}-${CAESIUM_ARCH} \
-    && curl -sS -L -O --output-dir /tmp/ --create-dirs  "https://github.com/$CAESIUM_GITHUB_REPO/releases/latest/download/${CAESIUM_ARCHIVE}.tar.gz" \
-    && tar xzf "/tmp/${CAESIUM_ARCHIVE}.tar.gz" -C /tmp \
-    && mv "/tmp/${CAESIUM_ARCHIVE}/caesiumclt" /usr/local/bin/caesiumclt
-
-FROM zocker160/handbrake-nvenc:latest
-
-# Use apt-get for Ubuntu, add a PPA for special packages, and use correct package names
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends software-properties-common && \
-    # Add the -y flag here to auto-confirm adding the PPA
-    add-apt-repository -y ppa:savvymike/ppa && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-    jq \
-    curl \
-    libvips-tools \
-    exiftool \
-    ffmpeg \
-    imagemagick \
-    libjxl-tools \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY --from=builder /usr/local/bin/caesiumclt /usr/local/bin/caesiumclt
-
-COPY config/lossless /etc/immich-upload-optimizer/config
-COPY config /etc/immich-upload-optimizer/bundled-configs
-ENV IUO_TASKS_FILE=/etc/immich-upload-optimizer/config/tasks.yaml
-
-COPY immich-upload-optimizer /usr/local/bin/
-CMD ["immich-upload-optimizer"]
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
