@@ -32,8 +32,8 @@ dockers:
     - "--label=org.opencontainers.image.title={{.ProjectName}}"
     - "--label=org.opencontainers.image.revision={{.FullCommit}}"
     - "--label=org.opencontainers.image.version={{.Version}}"
-    - "--label=org.opencontainers.image.url=https://github.com/${GHCR_USER}/{{ .ProjectName }}"
-    - "--label=org.opencontainers.image.source=https://github.com/${GHCR_USER}/{{ .ProjectName }}"
+    - "--label=org.opencontainers.image.url=https://github.com/${ .Env.GHCR_USER }/{{ .ProjectName }}"
+    - "--label=org.opencontainers.image.source=https://github.com/${ .Env.GHCR_USER }/{{ .ProjectName }}"
     extra_files:
     - config
     - LICENSE
@@ -51,8 +51,8 @@ dockers:
     - "--label=org.opencontainers.image.title={{.ProjectName}}"
     - "--label=org.opencontainers.image.revision={{.FullCommit}}"
     - "--label=org.opencontainers.image.version={{.Version}}"
-    - "--label=org.opencontainers.image.url=https://github.com/${GHCR_USER}/{{ .ProjectName }}"
-    - "--label=org.opencontainers.image.source=https://github.com/${GHCR_USER}/{{ .ProjectName }}"
+    - "--label=org.opencontainers.image.url=https://github.com/${ .Env.GHCR_USER }/{{ .ProjectName }}"
+    - "--label=org.opencontainers.image.source=https://github.com/${ .Env.GHCR_USER }/{{ .ProjectName }}"
     extra_files:
     - config
     - LICENSE
@@ -60,23 +60,23 @@ docker_manifests:
   - 
     name_template: ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:latest
     image_templates:
-    - ghcr.io/${GHCR_USER}/{{ .ProjectName }}:{{ .Tag }}-amd64
-    - ghcr.io/${GHCR_USER}/{{ .ProjectName }}:{{ .Tag }}-arm64v8
+    - ghcr.io/${ .Env.GHCR_USER }/{{ .ProjectName }}:{{ .Tag }}-amd64
+    - ghcr.io/${ .Env.GHCR_USER }/{{ .ProjectName }}:{{ .Tag }}-arm64v8
   - 
     name_template: ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:{{ .Tag }}
     image_templates:
-    - ghcr.io/${GHCR_USER}/{{ .ProjectName }}:{{ .Tag }}-amd64
-    - ghcr.io/${GHCR_USER}/{{ .ProjectName }}:{{ .Tag }}-arm64v8
+    - ghcr.io/${ .Env.GHCR_USER }/{{ .ProjectName }}:{{ .Tag }}-amd64
+    - ghcr.io/${ .Env.GHCR_USER }/{{ .ProjectName }}:{{ .Tag }}-arm64v8
   - 
-    name_template: ghcr.io/${GHCR_USER}/{{.ProjectName}}:v{{ .Major }}
+    name_template: ghcr.io/${ .Env.GHCR_USER }/{{.ProjectName}}:v{{ .Major }}
     image_templates:
-    - ghcr.io/${GHCR_USER}/{{ .ProjectName }}:{{ .Tag }}-amd64
-    - ghcr.io/${GHCR_USER}/{{ .ProjectName }}:{{ .Tag }}-arm64v8
+    - ghcr.io/${ .Env.GHCR_USER }/{{ .ProjectName }}:{{ .Tag }}-amd64
+    - ghcr.io/${ .Env.GHCR_USER }/{{ .ProjectName }}:{{ .Tag }}-arm64v8
   - 
-    name_template: ghcr.io/${GHCR_USER}/{{.ProjectName}}:v{{ .Major }}.{{ .Minor }}
+    name_template: ghcr.io/${ .Env.GHCR_USER }/{{.ProjectName}}:v{{ .Major }}.{{ .Minor }}
     image_templates:
-    - ghcr.io/${GHCR_USER}/{{ .ProjectName }}:{{ .Tag }}-amd64
-    - ghcr.io/${GHCR_USER}/{{ .ProjectName }}:{{ .Tag }}-arm64v8
+    - ghcr.io/${ .Env.GHCR_USER }/{{ .ProjectName }}:{{ .Tag }}-amd64
+    - ghcr.io/${ .Env.GHCR_USER }/{{ .ProjectName }}:{{ .Tag }}-arm64v8
 archives:
   - 
     files:
