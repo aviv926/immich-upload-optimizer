@@ -1,6 +1,7 @@
 name: goreleaser
 
 on:
+  workflow_dispatch: # This line enables manual triggers
   pull_request:
   push:
     tags:
