@@ -16,14 +16,12 @@ RUN CAESIUM_LATEST_RELEASE=$(curl -s https://api.github.com/repos/$CAESIUM_GITHU
 
 FROM zocker160/handbrake-nvenc:latest
 
-# Install dependencies and add required PPAs in the correct order
-# See: https://launchpad.net/~savoury1/+archive/ubuntu/jxl
+# Install dependencies by enabling the standard 'universe' repository.
+# This avoids adding conflicting third-party PPAs.
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       software-properties-common \
-    && add-apt-repository ppa:savoury1/backports -y \
-    && add-apt-repository ppa:savoury1/ffmpeg4 -y \
-    && add-apt-repository ppa:savoury1/jxl -y \
+    && add-apt-repository universe -y \
     && apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       jq \
