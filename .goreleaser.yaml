@@ -1,5 +1,3 @@
-# .goreleaser.yaml
-
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 version: 2
 before:
@@ -7,21 +5,27 @@ before:
     - go generate ./...
     - go mod tidy
 builds:
-  - # SIMPLIFIED: Only build for the platforms needed by your Docker images.
+  - id: 'linux-amd64-build' # Give the build an ID to reference it
     env:
       - CGO_ENABLED=0
     goos:
       - linux
     goarch:
       - amd64
-      - arm64
-# dockers section and the rest of the file remain the same...
+
 dockers:
   -
-    goos: linux
-    goarch: amd64
+    # Reference the specific build ID.
+    # This ensures this docker build only runs for linux/amd64
+    builds:
+      - 'linux-amd64-build'
     image_templates:
-    - "ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:{{ .Tag }}-amd64"
+      # All tags are now created for the single amd64 image.
+      - "ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:{{ .Tag }}"
+      - "ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:v{{ .Major }}.{{ .Minor }}"
+      - "ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:v{{ .Major }}"
+      # Only tag 'latest' for actual releases, not for snapshots.
+      - "{{ if not .IsSnapshot }}ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:latest{{ end }}"
     dockerfile: 'Dockerfile.goreleaser'
     use: buildx
     build_flag_templates:
@@ -36,66 +40,28 @@ dockers:
     extra_files:
     - config
     - LICENSE
-  -
-    goos: linux
-    goarch: arm64
-    image_templates:
-    - "ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:{{ .Tag }}-arm64v8"
-    dockerfile: 'Dockerfile.goreleaser'
-    use: buildx
-    build_flag_templates:
-    - "--pull"
-    - "--platform=linux/arm64/v8"
-    - "--label=org.opencontainers.image.created={{.Date}}"
-    - "--label=org.opencontainers.image.title={{.ProjectName}}"
-    - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-    - "--label=org.opencontainers.image.version={{.Version}}"
-    - "--label=org.opencontainers.image.url=https://github.com/{{ .Env.GHCR_USER }}/{{ .ProjectName }}"
-    - "--label=org.opencontainers.image.source=https://github.com/{{ .Env.GHCR_USER }}/{{ .ProjectName }}"
-    extra_files:
-    - config
-    - LICENSE
 
-# THIS ENTIRE SECTION HAS BEEN CORRECTED TO USE {{...}} SYNTAX
-docker_manifests:
-  - 
-    name_template: ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:latest
-    image_templates:
-    - ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:{{ .Tag }}-amd64
-    - ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:{{ .Tag }}-arm64v8
-  - 
-    name_template: ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:{{ .Tag }}
-    image_templates:
-    - ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:{{ .Tag }}-amd64
-    - ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:{{ .Tag }}-arm64v8
-  - 
-    name_template: ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:v{{ .Major }}
-    image_templates:
-    - ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:{{ .Tag }}-amd64
-    - ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:{{ .Tag }}-arm64v8
-  - 
-    name_template: ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:v{{ .Major }}.{{ .Minor }}
-    image_templates:
-    - ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:{{ .Tag }}-amd64
-    - ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:{{ .Tag }}-arm64v8
+# We no longer need docker_manifests because we are only building a single architecture.
+# The `image_templates` in the `dockers` section handles all the tagging.
+# docker_manifests: ...
 
 archives:
-  - 
+  -
+    # This section is optional if you only care about the Docker image,
+    # but it's good practice to keep it for creating release artifacts.
+    builds:
+      - 'linux-amd64-build'
     files:
       - LICENSE*
       - README*
       - CHANGELOG*
-    formats: tar.gz
+    format: tar.gz
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
-      {{- if .Arm }}v{{ .Arm }}{{ end }}
-    format_overrides:
-    - goos: windows
-      formats: zip
 
 checksum:
   name_template: 'checksums.txt'
