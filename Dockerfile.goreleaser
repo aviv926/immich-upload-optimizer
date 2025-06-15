@@ -1,36 +1,73 @@
-FROM ubuntu:latest AS builder
+# Dockerfile.goreleaser
+
+# Stage 1: Builder for caesium-clt. (No changes needed)
+FROM ubuntu:22.04 AS builder
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get -qq -y install jq curl
 
 ARG TARGETPLATFORM
-
 ARG CAESIUM_GITHUB_REPO=Lymphatus/caesium-clt
+
 RUN CAESIUM_LATEST_RELEASE=$(curl -s https://api.github.com/repos/$CAESIUM_GITHUB_REPO/releases/latest | jq -r '.tag_name') \
     && if [ "$TARGETPLATFORM" = "linux/amd64" ]; then CAESIUM_ARCH=x86_64-unknown-linux-musl; \
        elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then CAESIUM_ARCH=aarch64-unknown-linux-musl; \
        else echo "Platform not supported by ${CAESIUM_GITHUB_REPO}"; exit 126; fi \
     && CAESIUM_ARCHIVE=caesiumclt-${CAESIUM_LATEST_RELEASE}-${CAESIUM_ARCH} \
-    && curl -sS -L -O --output-dir /tmp/ --create-dirs  "https://github.com/$CAESIUM_GITHUB_REPO/releases/latest/download/${CAESIUM_ARCHIVE}.tar.gz" \
+    && curl -sS -L -O --output-dir /tmp/ --create-dirs  "https://github.com/$CAESIUM_GITHUB_REPO/releases/latest/download/${CAESIUM_LATEST_RELEASE}/${CAESIUM_ARCHIVE}.tar.gz" \
     && tar xzf "/tmp/${CAESIUM_ARCHIVE}.tar.gz" -C /tmp \
     && mv "/tmp/${CAESIUM_ARCHIVE}/caesiumclt" /usr/local/bin/caesiumclt
 
-FROM zocker160/handbrake-nvenc:latest
 
-# Install dependencies by enabling the standard 'universe' repository.
-# This avoids adding conflicting third-party PPAs.
+# Stage 2: Final Image
+FROM nvidia/cuda:12.1.1-base-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install all dependencies dynamically
 RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      jq \
-      curl \
+    # Install prerequisite tools first, including jq
+    apt-get install -y --no-install-recommends software-properties-common curl jq && \
+    \
+    # --- Dynamically get and install the LATEST libjxl from GitHub releases ---
+    echo "Determining latest libjxl version..." && \
+    JXL_LATEST_TAG=$(curl -s https://api.github.com/repos/libjxl/libjxl/releases/latest | jq -r '.tag_name') && \
+    if [ -z "$JXL_LATEST_TAG" ]; then echo "Error: Could not determine latest libjxl tag." >&2; exit 1; fi && \
+    echo "Latest libjxl version is ${JXL_LATEST_TAG}" && \
+    \
+    echo "Installing libjxl for ${TARGETPLATFORM}" && \
+    if [ "${TARGETPLATFORM}" = "linux/amd64" ]; then \
+        JXL_ASSET="jxl-debs-amd64-ubuntu-22.04-${JXL_LATEST_TAG}.tar.gz"; \
+        curl -sL -o /tmp/jxl.tar.gz "https://github.com/libjxl/libjxl/releases/download/${JXL_LATEST_TAG}/${JXL_ASSET}" && \
+        mkdir -p /tmp/jxl-debs && \
+        tar -xf /tmp/jxl.tar.gz -C /tmp/jxl-debs && \
+        apt-get install -y /tmp/jxl-debs/*.deb; \
+    elif [ "${TARGETPLATFORM}" = "linux/arm64" ]; then \
+        JXL_ASSET="jxl-linux-aarch64-static-${JXL_LATEST_TAG}.tar.gz"; \
+        curl -sL -o /tmp/jxl.tar.gz "https://github.com/libjxl/libjxl/releases/download/${JXL_LATEST_TAG}/${JXL_ASSET}" && \
+        tar -xf /tmp/jxl.tar.gz -C /usr/local --strip-components=1; \
+    else \
+        echo "Unsupported platform for libjxl: ${TARGETPLATFORM}" && exit 1; \
+    fi && \
+    # --- End libjxl installation ---
+    \
+    # --- Install HandBrake and other tools ---
+    add-apt-repository -y ppa:stebbins/handbrake-releases && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+      handbrake-cli \
       libvips-tools \
       exiftool \
-      libjxl-tools \
       ffmpeg \
       imagemagick \
-    && rm -rf /var/lib/apt/lists/*
+    # --- End tool installation ---
+    \
+    # --- Cleanup ---
+    && apt-get remove -y software-properties-common jq && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* /tmp/jxl.tar.gz /tmp/jxl-debs
+
 
 COPY --from=builder /usr/local/bin/caesiumclt /usr/local/bin/caesiumclt
-
 
 COPY config/lossless /etc/immich-upload-optimizer/config
 COPY config /etc/immich-upload-optimizer/bundled-configs
