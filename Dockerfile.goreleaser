@@ -1,68 +1,47 @@
-# Dockerfile.goreleaser
-
-# Stage 1: Builder for caesium-clt.
+# We use ubuntu:22.04 here which is a common and stable base
 FROM ubuntu:22.04 AS builder
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get -qq -y install jq curl
 
-ARG TARGETPLATFORM
+# We only build for amd64 now, so TARGETPLATFORM logic is simpler
+ARG TARGETPLATFORM=linux/amd64
+
 ARG CAESIUM_GITHUB_REPO=Lymphatus/caesium-clt
+RUN CAESIUM_LATEST_RELEASE=$(curl -s https://api.github.com/repos/$CAESIUM_GITHUB_REPO/releases/latest | jq -r '.tag_name') \
+    && if [ "$TARGETPLATFORM" = "linux/amd64" ]; then CAESIUM_ARCH=x86_64-unknown-linux-musl; \
+       else echo "Platform not supported by ${CAESIUM_GITHUB_REPO}"; exit 126; fi \
+    && CAESIUM_ARCHIVE=caesiumclt-${CAESIUM_LATEST_RELEASE}-${CAESIUM_ARCH} \
+    && curl -sS -L -O --output-dir /tmp/ --create-dirs  "https://github.com/$CAESIUM_GITHUB_REPO/releases/latest/download/${CAESIUM_ARCHIVE}.tar.gz" \
+    && tar xzf "/tmp/${CAESIUM_ARCHIVE}.tar.gz" -C /tmp \
+    && mv "/tmp/${CAESIUM_ARCHIVE}/caesiumclt" /usr/local/bin/caesiumclt
 
-# --- CORRECTED LOGIC FOR DOWNLOADING CAESIUM-CLT ---
-# Use the /releases endpoint and take the first item to get the true latest release, including pre-releases.
-RUN CAESIUM_LATEST_TAG=$(curl -s https://api.github.com/repos/${CAESIUM_GITHUB_REPO}/releases | jq -r '.[0].tag_name') && \
-    if [ -z "$CAESIUM_LATEST_TAG" ]; then echo "Error: Could not determine latest caesium-clt tag." >&2; exit 1; fi && \
-    \
-    if [ "${TARGETPLATFORM}" = "linux/amd64" ]; then CAESIUM_ARCH=x86_64-unknown-linux-musl; \
-    elif [ "${TARGETPLATFORM}" = "linux/arm64" ]; then CAESIUM_ARCH=aarch64-unknown-linux-musl; \
-    else echo "Platform not supported by ${CAESIUM_GITHUB_REPO}"; exit 126; fi && \
-    \
-    # The asset filename for the latest versions does NOT contain the version tag.
-    CAESIUM_ASSET="caesiumclt-${CAESIUM_ARCH}.tar.gz" && \
-    # The download URL requires the version tag in the path.
-    CAESIUM_DOWNLOAD_URL="https://github.com/${CAESIUM_GITHUB_REPO}/releases/download/${CAESIUM_LATEST_TAG}/${CAESIUM_ASSET}" && \
-    \
-    echo "Downloading Caesium from ${CAESIUM_DOWNLOAD_URL}" && \
-    curl -sS -L -o "/tmp/${CAESIUM_ASSET}" "${CAESIUM_DOWNLOAD_URL}" && \
-    \
-    # The directory inside the tarball also does not contain the version tag.
-    tar xzf "/tmp/${CAESIUM_ASSET}" -C /tmp && \
-    mv "/tmp/caesiumclt-${CAESIUM_ARCH}/caesiumclt" /usr/local/bin/caesiumclt
+# Final stage
+FROM zocker160/handbrake-nvenc:latest
 
+# Install libjxl-tools manually from GitHub releases
+ARG LIBJXL_VERSION=v0.11.1
+ARG LIBJXL_UBUNTU_VERSION=22.04
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && LIBJXL_DEBS_ARCHIVE="jxl-debs-amd64-ubuntu-${LIBJXL_UBUNTU_VERSION}-${LIBJXL_VERSION}.tar.gz" \
+    && curl -sS -L -o "/tmp/${LIBJXL_DEBS_ARCHIVE}" "https://github.com/libjxl/libjxl/releases/download/${LIBJXL_VERSION}/${LIBJXL_DEBS_ARCHIVE}" \
+    && mkdir -p /tmp/jxl-debs \
+    && tar xzf "/tmp/${LIBJXL_DEBS_ARCHIVE}" -C /tmp/jxl-debs \
+    # Use dpkg to install the downloaded .deb files. This handles dependencies.
+    && apt-get install -y /tmp/jxl-debs/*.deb \
+    # Clean up to keep the image small
+    && rm -rf /tmp/jxl-debs /tmp/${LIBJXL_DEBS_ARCHIVE}
 
-# Stage 2: Final Image (This part is correct and does not need changes)
-FROM nvidia/cuda:12.1.1-base-ubuntu22.04
-
-ENV DEBIAN_FRONTEND=noninteractive
-
+# Install other required tools
+# REMOVED: libjxl-tools (installed above) and libc6-compat (incorrect for ubuntu)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends software-properties-common curl jq && \
-    JXL_LATEST_TAG=$(curl -s https://api.github.com/repos/libjxl/libjxl/releases/latest | jq -r '.tag_name') && \
-    if [ -z "$JXL_LATEST_TAG" ]; then echo "Error: Could not determine latest libjxl tag." >&2; exit 1; fi && \
-    if [ "${TARGETPLATFORM}" = "linux/amd64" ]; then \
-        JXL_ASSET="jxl-debs-amd64-ubuntu-22.04-${JXL_LATEST_TAG}.tar.gz"; \
-        curl -sL -o /tmp/jxl.tar.gz "https://github.com/libjxl/libjxl/releases/download/${JXL_LATEST_TAG}/${JXL_ASSET}" && \
-        mkdir -p /tmp/jxl-debs && \
-        tar -xf /tmp/jxl.tar.gz -C /tmp/jxl-debs && \
-        apt-get install -y /tmp/jxl-debs/*.deb; \
-    elif [ "${TARGETPLATFORM}" = "linux/arm64" ]; then \
-        JXL_ASSET="jxl-linux-aarch64-static-${JXL_LATEST_TAG}.tar.gz"; \
-        curl -sL -o /tmp/jxl.tar.gz "https://github.com/libjxl/libjxl/releases/download/${JXL_LATEST_TAG}/${JXL_ASSET}" && \
-        tar -xf /tmp/jxl.tar.gz -C /usr/local --strip-components=1; \
-    else \
-        echo "Unsupported platform for libjxl: ${TARGETPLATFORM}" && exit 1; \
-    fi && \
-    add-apt-repository -y ppa:stebbins/handbrake-releases && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends \
-      handbrake-cli \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      jq \
+      curl \
       libvips-tools \
       exiftool \
       ffmpeg \
       imagemagick \
-    && apt-get remove -y software-properties-common jq && \
-    apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/* /tmp/jxl.tar.gz /tmp/jxl-debs
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/bin/caesiumclt /usr/local/bin/caesiumclt
 
