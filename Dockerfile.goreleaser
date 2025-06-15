@@ -23,6 +23,8 @@ RUN apt-get update && \
       curl \
       libvips-tools \
       exiftool \
+      libjxl-tools \
+      libc6-compat \
       ffmpeg \
       imagemagick \
     && rm -rf /var/lib/apt/lists/*
