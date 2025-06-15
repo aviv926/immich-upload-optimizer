@@ -5,7 +5,7 @@ before:
     - go generate ./...
     - go mod tidy
 builds:
-  - id: 'linux-amd64-build' # Give the build an ID to reference it
+  - id: 'linux-amd64-build' # The ID is still useful for the archives section
     env:
       - CGO_ENABLED=0
     goos:
@@ -15,12 +15,12 @@ builds:
 
 dockers:
   -
-    # Reference the specific build ID.
-    # This ensures this docker build only runs for linux/amd64
-    builds:
-      - 'linux-amd64-build'
+    # THIS IS THE CORRECTED PART.
+    # We filter by goos and goarch, not by build ID.
+    goos: linux
+    goarch: amd64
+    
     image_templates:
-      # All tags are now created for the single amd64 image.
       - "ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:{{ .Tag }}"
       - "ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:v{{ .Major }}.{{ .Minor }}"
       - "ghcr.io/{{ .Env.GHCR_USER }}/{{ .ProjectName }}:v{{ .Major }}"
@@ -41,14 +41,9 @@ dockers:
     - config
     - LICENSE
 
-# We no longer need docker_manifests because we are only building a single architecture.
-# The `image_templates` in the `dockers` section handles all the tagging.
-# docker_manifests: ...
-
 archives:
   -
-    # This section is optional if you only care about the Docker image,
-    # but it's good practice to keep it for creating release artifacts.
+    # The `builds` key IS correct for the archives section.
     builds:
       - 'linux-amd64-build'
     files:
