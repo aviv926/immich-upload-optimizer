@@ -19,12 +19,15 @@ FROM zocker160/handbrake-nvenc:latest
 # Install required tools (no external PPA needed)
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      software-properties-common \
+    && add-apt-repository ppa:savoury1/jxl -y && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       jq \
       curl \
       libvips-tools \
       exiftool \
       libjxl-tools \
-      libc6-compat \
       ffmpeg \
       imagemagick \
     && rm -rf /var/lib/apt/lists/*
